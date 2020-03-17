@@ -53,14 +53,25 @@ function _M.filter()
     
     local matcher_list = VeryNginxConfig.configs['matcher']
     local upstream_list = VeryNginxConfig.configs['backend_upstream']
-
+    --proxy_host can be special host or empty
+    local proxy_rule = nil
     for i, rule in ipairs( VeryNginxConfig.configs["proxy_pass_rule"] ) do
-        local enable = rule['enable']
-        local matcher = matcher_list[ rule['matcher'] ] 
-        if enable == true and request_tester.test( matcher ) == true then
-            --ngx.log(ngx.STDERR,'upstream:',rule['upstream'])
+        if rule['proxy_host'] == ngx.var.host then
+            proxy_rule = rule
+            break
+        end
+        if proxy_rule == nil and rule['proxy_host'] == '' then
+            proxy_rule = rule
+        end
+    end
 
-            local upstream = upstream_list[ rule['upstream'] ]
+    if proxy_rule ~= nil then
+        local enable = proxy_rule['enable'] 
+        local matcher = matcher_list[ proxy_rule['matcher'] ] 
+        if enable == true and request_tester.test( matcher ) == true then
+            --ngx.log(ngx.STDERR,'upstream:',proxy_rule['upstream'])
+
+            local upstream = upstream_list[ proxy_rule['upstream'] ]
             local node = _M.find_node( upstream )
             
             ngx.var.vn_proxy_scheme = node['scheme']
@@ -77,8 +88,8 @@ function _M.filter()
             end
             
             --set vn_header_host
-            if rule['proxy_host'] ~= '' then
-                ngx.var.vn_header_host = rule['proxy_host']
+            if proxy_rule['proxy_host'] ~= '' then
+                ngx.var.vn_header_host = proxy_rule['proxy_host']
             else
                 ngx.var.vn_header_host = ngx.var.host
             end
